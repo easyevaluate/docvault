@@ -3,6 +3,7 @@
  * and accept POST /refresh with { refreshToken } returning new tokens.
  */
 
+import { jwtDecode } from 'jwt-decode';
 import api from './api'
 
 export function saveTokens(obj) {
@@ -21,10 +22,38 @@ export function isLoggedIn() {
   return !!localStorage.getItem('accessToken')
 }
 
-export async function refreshTokens() {
-  const rt = localStorage.getItem('refreshToken')
-  if (!rt) throw new Error('No refresh token')
-  const res = await api.authPost('/refresh', { refreshToken: rt })
-  if (res.accessToken) saveTokens(res)
-  return res
+const authBase = 'http://localhost:5050/api/auth'
+export async function refreshTokens(refreshToken) {
+  if (!refreshToken) throw new Error('No refresh token')
+
+  try {
+    const res = await fetch(`${authBase}/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    const data = await res.json();
+    saveTokens(data)
+
+  } catch (err) {
+    console.error('Failed to refresh token:', err);
+  }
+}
+
+export async function initAuth() {
+  const accessToken = localStorage.getItem('accessToken');
+  const refreshToken = localStorage.getItem('refreshToken');
+
+  if (!accessToken && refreshToken) {
+    console.log('refresh token called: 1');
+    await refreshTokens(refreshToken);
+  } else if (accessToken && isExpired(accessToken) && refreshToken) {
+    console.log('refresh token called: 2');
+    await refreshTokens(refreshToken);
+  }
+}
+
+function isExpired(token) {
+  const { exp } = jwtDecode(token);
+  return Date.now() >= exp * 1000;
 }
