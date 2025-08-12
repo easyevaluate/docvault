@@ -1,31 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
-import { msalInstance, loginRequest } from "../services/msalConfig";
 import api from "../services/api";
 import { saveTokens } from "../services/auth";
-import FacebookLogin from "@greatsumini/react-facebook-login";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
-  const [msalInitialized, setMsalInitialized] = useState(false);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const initializeMsal = async () => {
-      try {
-        await msalInstance.initialize();
-        setMsalInitialized(true);
-      } catch (error) {
-        console.error("MSAL initialization failed:", error);
-        setError("Microsoft login initialization failed");
-      }
-    };
-
-    initializeMsal();
-  }, []);
 
   async function handleGoogleLogin(credentialResponse) {
     setError(null);
@@ -51,68 +34,11 @@ export default function Login() {
   });
 
   async function handleMicrosoftLogin() {
-    if (!msalInitialized) {
-      setError("Microsoft login is not ready yet. Please try again.");
-      return;
-    }
-
-    setError(null);
-    try {
-      const loginResponse = await msalInstance.loginPopup(loginRequest);
-      const account = loginResponse.account;
-      const email = account.username;
-      const name = account.name;  
-
-      console.log("Email:", email);
-      console.log("Name:", name);
-
-      // Send the access token to your backend
-      console.log("Microsoft login response:", loginResponse);
-      const res = await api.authPost("/provider", {
-        token: loginResponse.accessToken,
-        provider: "microsoft",
-      });
-
-      saveTokens(res);
-      navigate("/dashboard");
-    } catch (err) {
-      setError(err.message || "Microsoft login failed");
-    }
+    // handle microsoft login
   }
 
-  async function handleFacebookLogin(response) {
-    setError(null);
-    try {
-      if (response.status === "unknown") {
-        setError("Facebook login was cancelled");
-        return;
-      }
-
-      console.log("Facebook login response:", response);
-      
-      // Extract user information similar to Microsoft pattern
-      const email = response.email;
-      const name = response.name;
-      
-      console.log("Email:", email);
-      console.log("Name:", name);
-
-      // Send the access token to your backend
-      const res = await api.authPost("/provider", {
-        token: response.accessToken,
-        provider: "facebook",
-      });
-
-      saveTokens(res);
-      navigate("/dashboard");
-    } catch (err) {
-      setError(err.message || "Facebook login failed");
-    }
-  }
-
-  function handleFacebookError(error) {
-    console.error("Facebook login error:", error);
-    setError("Facebook login failed");
+  async function handleFacebookLogin() {
+    // handle facebook login 
   }
 
   async function submit(e) {
@@ -189,7 +115,6 @@ export default function Login() {
             <button
               type="button"
               onClick={handleMicrosoftLogin}
-              disabled={!msalInitialized}
               className={"w-full flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"}
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 23 23">
@@ -202,25 +127,16 @@ export default function Login() {
             </button>
           </div>
           <div>
-            <FacebookLogin
-              appId={import.meta.env.VITE_FACEBOOK_APP_ID}
-              onSuccess={handleFacebookLogin}
-              onFail={handleFacebookError}
-              fields="name,email,picture"
-              scope="email"
-              render={({ onClick, logout }) => (
-                <button
-                  type="button"
-                  onClick={onClick}
-                  className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                    <path fill="#1877f2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                  Facebook
-                </button>
-              )}
-            />
+            <button
+              type="button"
+              onClick={handleFacebookLogin}
+              className={"w-full flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"}
+            >
+              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                <path fill="#1877f2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+              Facebook
+            </button>
           </div>
         </div>
       </div>
