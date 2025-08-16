@@ -7,6 +7,8 @@
  * (except file download and multipart upload cases).
  */
 
+import { initAuth } from "./auth"
+
 const authBase = 'http://localhost:5050/api/auth'
 const filesBase = 'http://localhost:5055/api/files'
 
@@ -22,6 +24,7 @@ function handleResp(res) {
 }
 
 async function authPost(path, body) {
+
   const token = localStorage.getItem('accessToken')
   const refreshToken = localStorage.getItem('refreshToken')
 
@@ -40,6 +43,8 @@ async function authPost(path, body) {
 }
 
 async function filesGet(path) {
+  await initAuth()
+
   const token = localStorage.getItem('accessToken')
   const refreshToken = localStorage.getItem('refreshToken')
 
