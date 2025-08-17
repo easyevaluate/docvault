@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useGoogleLogin } from "@react-oauth/google";
 import api from "../services/api";
 import { saveTokens } from "../services/auth";
 
@@ -21,37 +20,6 @@ export default function Login() {
     window.location.href =
       "http://localhost:5050/api/oauth/github/http%3A%2F%2Flocalhost%3A5173%2Flogin";
   };
-
-  async function handleGoogleLogin(credentialResponse) {
-    setError(null);
-    try {
-      const res = await api.authPost("/provider", {
-        data: {
-          token: credentialResponse.access_token
-        },
-        provider: "google",
-      });
-      saveTokens(res);
-      navigate("/dashboard");
-    } catch (err) {
-      setError(err.message || "Google login failed");
-    }
-  }
-
-  const googleLogin = useGoogleLogin({
-    onSuccess: handleGoogleLogin,
-    onError: () => {
-      setError("Google login failed");
-    },
-  });
-
-  async function handleMicrosoftLogin() {
-    // handle microsoft login
-  }
-
-  async function handleFacebookLogin() {
-    // handle facebook login 
-  }
 
   async function submit(e) {
     e.preventDefault();
