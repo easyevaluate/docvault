@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import api from "../services/api";
 import { saveTokens } from "../services/auth";
 
@@ -7,18 +7,17 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
   const [data, setData] = useState();
-  const code = new URLSearchParams(window.location.search).get("login_code");
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const handleGoogleLogin = () => {
-    window.location.href =
-      "http://localhost:5050/api/oauth/google/http%3A%2F%2Flocalhost%3A5173%2Flogin";
-  };
+  const queryParams = new URLSearchParams(location.search);
+  const code = queryParams.get("login_code");
+  const oauthBase = "http://localhost:5050/api/oauth";
 
-  const handleGithubLogin = () => {
-    window.location.href =
-      "http://localhost:5050/api/oauth/github/http%3A%2F%2Flocalhost%3A5173%2Flogin";
+  const handleOAuthLogin = (provider) => {
+    const redirectUri = encodeURIComponent(`${window.location.origin}/login`);
+    window.location.href = `${oauthBase}/${provider}/${redirectUri}`;
   };
 
   async function submit(e) {
@@ -118,7 +117,7 @@ export default function Login() {
           <div>
             <button
               type="button"
-              onClick={handleGoogleLogin}
+              onClick={() => handleOAuthLogin("google")}
               className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 cursor-pointer"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -145,7 +144,7 @@ export default function Login() {
           <div>
             <button
               type="button"
-              onClick={handleGithubLogin}
+              onClick={() => handleOAuthLogin("github")}
               className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 cursor-pointer"
             >
               <svg
