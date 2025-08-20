@@ -1,15 +1,26 @@
 import React from "react";
-import { Routes, Route, Link } from "react-router-dom";
+import { Routes, Route, Link, useNavigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Forgot from "./pages/Forgot";
 import Reset from "./pages/Reset";
 import Dashboard from "./pages/Dashboard";
-import { isLoggedIn, logout } from "./services/auth";
+import { isLoggedIn, logout as authLogout } from "./services/auth";
 import ProtectedRoute from "./components/ProtectedRoute";
 import VerifyEmail from "./pages/VerifyEmail";
 
 export default function App() {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await authLogout();
+      navigate("/login");
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
+
   return (
     <div>
       <nav className="bg-gray-800 text-white p-3">
@@ -27,12 +38,7 @@ export default function App() {
             {isLoggedIn() && (
               <>
                 <Link to="/dashboard">Dashboard</Link>
-                <button
-                  onClick={() => {
-                    logout();
-                  }}
-                  className="ml-2 cursor-pointer"
-                >
+                <button onClick={handleLogout} className="ml-2 cursor-pointer">
                   Logout
                 </button>
               </>

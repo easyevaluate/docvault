@@ -3,52 +3,53 @@
  * and accept POST /refresh with { refreshToken } returning new tokens.
  */
 
-import { jwtDecode } from 'jwt-decode';
-import api from './api'
+import { jwtDecode } from "jwt-decode";
+import api from "./api";
 
 export function saveTokens(obj) {
-  if (obj.data.tokens.accessToken) localStorage.setItem('accessToken', obj.data.tokens.accessToken)
-  if (obj.data.tokens.refreshToken) localStorage.setItem('refreshToken', obj.data.tokens.refreshToken)
+  if (obj.data.tokens.accessToken)
+    localStorage.setItem("accessToken", obj.data.tokens.accessToken);
+  if (obj.data.tokens.refreshToken)
+    localStorage.setItem("refreshToken", obj.data.tokens.refreshToken);
 }
 
 export async function logout() {
-  await api.authPost('/logout')
+  await api.authPost("/logout");
 
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('refreshToken')
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
 }
 
 export function isLoggedIn() {
-  return !!localStorage.getItem('accessToken')
+  return !!localStorage.getItem("accessToken");
 }
 
-const authBase = 'http://localhost:5050/api/auth'
+const authBase = "http://localhost:5050/api/auth";
 export async function refreshTokens(refreshToken) {
-  if (!refreshToken) throw new Error('No refresh token')
+  if (!refreshToken) throw new Error("No refresh token");
 
   try {
     const res = await fetch(`${authBase}/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refreshToken }),
     });
     const data = await res.json();
-    saveTokens(data)
-
+    saveTokens(data);
   } catch (err) {
-    console.error('Failed to refresh token:', err);
+    console.error("Failed to refresh token:", err);
   }
 }
 
 export async function initAuth() {
-  const accessToken = localStorage.getItem('accessToken');
-  const refreshToken = localStorage.getItem('refreshToken');
+  const accessToken = localStorage.getItem("accessToken");
+  const refreshToken = localStorage.getItem("refreshToken");
 
   if (!accessToken && refreshToken) {
-    console.log('refresh token called: 1');
+    console.log("refresh token called: 1");
     await refreshTokens(refreshToken);
   } else if (accessToken && isExpired(accessToken) && refreshToken) {
-    console.log('refresh token called: 2');
+    console.log("refresh token called: 2");
     await refreshTokens(refreshToken);
   }
 }
