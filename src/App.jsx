@@ -47,7 +47,7 @@ export default function App() {
         </div>
       </nav>
 
-      <main className="w-5xl mx-auto mt-6">
+      <main className="max-w-5xl mx-auto p-6">
         <Routes>
           <Route
             path="/"

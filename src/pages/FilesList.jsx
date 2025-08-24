@@ -1,13 +1,26 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import api from "../services/api";
+import { FiDownload, FiTrash2 } from "react-icons/fi";
+import { BsFilePdf } from "react-icons/bs";
 
 export default function FilesList() {
   const [files, setFiles] = useState([]);
-  const [error, setError] = useState(null);
+  const [previews, setPreviews] = useState({});
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  async function load() {
+  // Helper: format file size
+  const formatFileSize = (size) => {
+    if (!size) return "";
+    return size >= 1024 * 1024
+      ? (size / (1024 * 1024)).toFixed(2) + " MB"
+      : (size / 1024).toFixed(2) + " KB";
+  };
+
+  // Load files from API
+  const loadFiles = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await api.filesGet("/");
       setFiles(res.data || []);
@@ -16,18 +29,57 @@ export default function FilesList() {
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    load();
-    const handler = () => load();
-    window.addEventListener("files-updated", handler);
-    return () => window.removeEventListener("files-updated", handler);
   }, []);
 
-  async function downloadFile(id, filename) {
+  // Listen for updates
+  useEffect(() => {
+    loadFiles();
+    const handler = () => loadFiles();
+    window.addEventListener("files-updated", handler);
+    return () => window.removeEventListener("files-updated", handler);
+  }, [loadFiles]);
+
+  // Generate image previews
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function generatePreviews() {
+      setPreviews((prev) => {
+        const existing = { ...prev };
+        return existing;
+      });
+
+      await Promise.all(
+        files.map(async (file) => {
+          if (file.mimetype?.startsWith("image/")) {
+            try {
+              const blob = await api.filesGet(`/download/${file.id}`);
+              if (!isCancelled) {
+                setPreviews((prev) => ({
+                  ...prev,
+                  [file.id]: URL.createObjectURL(blob),
+                }));
+              }
+            } catch (err) {
+              console.error(`Failed to load preview for ${file.id}`, err);
+            }
+          }
+        })
+      );
+    }
+
+    if (files.length > 0) generatePreviews();
+
+    return () => {
+      isCancelled = true;
+      Object.values(previews).forEach(URL.revokeObjectURL);
+    };
+  }, [files]);
+
+  // Download a file
+  const downloadFile = async (id, filename) => {
     try {
-      const blob = await api.filesDownload("/download/" + id);
+      const blob = await api.filesGet(`/download/${id}`);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -35,60 +87,88 @@ export default function FilesList() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (err) {
       alert(err.message || "Download failed");
     }
-  }
+  };
 
-  async function removeFile(id) {
+  // Delete a file
+  const removeFile = async (id) => {
     if (!confirm("Delete this file?")) return;
     try {
-      await api.filesDelete("/" + id);
-      load();
+      await api.filesDelete("/delete/" + id);
+      loadFiles();
     } catch (err) {
       alert(err.message || "Delete failed");
     }
-  }
+  };
 
   return (
-    <div className="rounded bg-white">
-      <h2 className="font-semibold mb-2">Your Files</h2>
+    <div className="rounded bg-white py-4">
+      <h2 className="font-semibold mb-4">Your Files</h2>
+
       {loading && <div>Loading...</div>}
       {error && <div className="text-red-600">{error}</div>}
       {!loading && files.length === 0 && (
         <div className="text-gray-600">No files yet.</div>
       )}
+
       <ul className="space-y-2">
         {files.map((f) => (
           <li
             key={f.id || f._id}
-            className="flex items-center justify-between p-2 border rounded"
+            className="flex items-center justify-between gap-4 p-3 border border-gray-200 rounded hover:bg-gray-50 transition"
           >
-            <div>
-              <div className="font-medium">
-                {f.originalname || f.filename || "Unnamed"}
-              </div>
-              <div className="text-sm text-gray-600">
-                {f.size
-                  ? f.size >= 1024 * 1024
-                    ? (f.size / (1024 * 1024)).toFixed(2) + " MB"
-                    : (f.size / 1024).toFixed(2) + " KB"
-                  : ""}
+            <div className="flex items-center space-x-4">
+              {f.mimetype?.startsWith("image/") ? (
+                <div className="w-16 h-16 rounded overflow-hidden bg-gray-200 relative">
+                  {previews[f.id] ? (
+                    <img
+                      src={previews[f.id]}
+                      alt={f.originalname || f.filename}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                      }}
+                    />
+                  ) : (
+                    <div className="animate-pulse w-full h-full bg-gray-300"></div>
+                  )}
+                </div>
+              ) : (
+                <div className="w-16 h-16 flex items-center justify-center bg-gray-200 rounded text-gray-500">
+                  <BsFilePdf className="text-2xl" />
+                </div>
+              )}
+
+              <div>
+                <div
+                  className="font-medium block max-w-full overflow-hidden whitespace-nowrap text-ellipsis"
+                  title={f.originalname || f.filename || "Unnamed"}
+                >
+                  {f.originalname || f.filename || "Unnamed"}
+                </div>
+                <div className="text-sm text-gray-600">
+                  {formatFileSize(f.size)}
+                </div>
               </div>
             </div>
-            <div className="space-x-2">
+
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => downloadFile(f.id)}
-                className="px-2 py-1 border rounded cursor-pointer"
+                onClick={() => downloadFile(f.id, f.originalname)}
+                className="p-2 rounded bg-gray-100 hover:bg-gray-200 transition cursor-pointer"
+                title="Download"
               >
-                Download
+                <FiDownload className="text-lg text-gray-700" />
               </button>
               <button
                 onClick={() => removeFile(f.id || f._id)}
-                className="px-2 py-1 bg-red-600 text-white rounded cursor-pointer"
+                className="p-2 rounded bg-red-600 hover:bg-red-700 transition cursor-pointer"
+                title="Delete"
               >
-                Delete
+                <FiTrash2 className="text-lg text-white" />
               </button>
             </div>
           </li>

@@ -31,10 +31,14 @@ export async function refreshTokens(refreshToken) {
   try {
     const res = await fetch(`${authBase}/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      headers: {
+        "Content-Type": "application/json",
+        "x-refresh-token": refreshToken
+      },
     });
     const data = await res.json();
+    console.log(data);
+
     saveTokens(data);
   } catch (err) {
     console.error("Failed to refresh token:", err);

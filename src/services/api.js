@@ -1,12 +1,3 @@
-/**
- * Simple API wrapper for the provided endpoints.
- * Auth base: http://localhost:5050/api/auth
- * Files base: http://localhost:5055/api/files
- *
- * This wrapper uses fetch and expects JSON responses
- * (except file download and multipart upload cases).
- */
-
 import { initAuth } from "./auth";
 
 const authBase = "http://localhost:5050/api/auth";
@@ -20,7 +11,7 @@ async function handleResp(res) {
     try {
       const j = await res.json();
       errorMsg = j?.msg || j?.message || errorMsg;
-    } catch {}
+    } catch { }
     throw new Error(errorMsg || "Something went wrong");
   }
 
@@ -87,19 +78,6 @@ async function filesPost(path, data, isMultipart = false) {
   return handleResp(res);
 }
 
-async function filesDownload(path) {
-  const token = localStorage.getItem("accessToken");
-  const refreshToken = localStorage.getItem("refreshToken");
-
-  const headers = {};
-  if (token) headers["Authorization"] = "Bearer " + token;
-  if (refreshToken) headers["x-refresh-token"] = refreshToken;
-  headers["x-service-id"] = "docvault";
-
-  const res = await fetch(filesBase + path, { headers });
-  return await handleResp(res);
-}
-
 async function filesDelete(path) {
   const token = localStorage.getItem("accessToken");
   const refreshToken = localStorage.getItem("refreshToken");
@@ -120,7 +98,5 @@ export default {
   authPost,
   filesGet,
   filesPost,
-  filesDownload,
   filesDelete,
-  filesBase,
 };
