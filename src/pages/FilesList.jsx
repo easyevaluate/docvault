@@ -6,10 +6,11 @@ import { BsFilePdf } from "react-icons/bs";
 export default function FilesList() {
   const [files, setFiles] = useState([]);
   const [previews, setPreviews] = useState({});
+  const [fileBlobs, setFileBlobs] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Helper: format file size
+  // Format file size
   const formatFileSize = (size) => {
     if (!size) return "";
     return size >= 1024 * 1024
@@ -17,7 +18,7 @@ export default function FilesList() {
       : (size / 1024).toFixed(2) + " KB";
   };
 
-  // Load files from API
+  // Load files list
   const loadFiles = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -31,7 +32,6 @@ export default function FilesList() {
     }
   }, []);
 
-  // Listen for updates
   useEffect(() => {
     loadFiles();
     const handler = () => loadFiles();
@@ -39,33 +39,34 @@ export default function FilesList() {
     return () => window.removeEventListener("files-updated", handler);
   }, [loadFiles]);
 
-  // Generate image previews
+  // Generate previews and store blobs for reuse
   useEffect(() => {
     let isCancelled = false;
 
     async function generatePreviews() {
-      setPreviews((prev) => {
-        const existing = { ...prev };
-        return existing;
-      });
+      const blobs = {};
+      const previewsMap = {};
 
       await Promise.all(
         files.map(async (file) => {
-          if (file.mimetype?.startsWith("image/")) {
-            try {
-              const blob = await api.filesGet(`/download/${file.id}`);
-              if (!isCancelled) {
-                setPreviews((prev) => ({
-                  ...prev,
-                  [file.id]: URL.createObjectURL(blob),
-                }));
-              }
-            } catch (err) {
-              console.error(`Failed to load preview for ${file.id}`, err);
+          try {
+            const blob = await api.filesGet(`/download/${file.id}`);
+            // Store blob for download later
+            blobs[file.id] = blob;
+            // If image, create preview URL
+            if (file.mimetype?.startsWith("image/")) {
+              previewsMap[file.id] = URL.createObjectURL(blob);
             }
+          } catch (err) {
+            console.error(`Failed to load preview for ${file.id}`, err);
           }
         })
       );
+
+      if (!isCancelled) {
+        setFileBlobs(blobs);
+        setPreviews(previewsMap);
+      }
     }
 
     if (files.length > 0) generatePreviews();
@@ -76,24 +77,25 @@ export default function FilesList() {
     };
   }, [files]);
 
-  // Download a file
-  const downloadFile = async (id, filename) => {
-    try {
-      const blob = await api.filesGet(`/download/${id}`);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename || "download";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
-    } catch (err) {
-      alert(err.message || "Download failed");
+  // Download using stored blob
+  const downloadFile = (id, filename) => {
+    const blob = fileBlobs[id];
+    if (!blob) {
+      alert("File not loaded yet, please try again.");
+      return;
     }
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename || "download";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
-  // Delete a file
+  // Delete file
   const removeFile = async (id) => {
     if (!confirm("Delete this file?")) return;
     try {
@@ -128,9 +130,7 @@ export default function FilesList() {
                       src={previews[f.id]}
                       alt={f.originalname || f.filename}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                      }}
+                      onError={(e) => (e.target.style.display = "none")}
                     />
                   ) : (
                     <div className="animate-pulse w-full h-full bg-gray-300"></div>

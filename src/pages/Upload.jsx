@@ -2,9 +2,11 @@ import React, { useState, useRef } from "react";
 import api from "../services/api";
 import { VscRunAbove } from "react-icons/vsc";
 import { FiUploadCloud } from "react-icons/fi";
+import { FiLink } from "react-icons/fi";
 
 export default function Upload() {
   const [file, setFile] = useState(null);
+  const [url, setUrl] = useState("");
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -22,15 +24,35 @@ export default function Upload() {
       form.append("file", selectedFile);
 
       await api.filesPost("/upload", form, true);
-      setMessage("Upload successful!");
+      setMessage("File uploaded successfully!");
       window.dispatchEvent(new Event("files-updated"));
 
       setFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
-      setError(err.message || "Upload failed");
+      setError(err.message || "File upload failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function uploadFromUrl() {
+    if (!url.trim()) {
+      setError("Please enter a valid URL");
+      return;
+    }
+
+    setMessage(null);
+    setError(null);
+    setLoading(true);
+
+    try {
+      await api.filesPost("/upload-url", { url });
+      setMessage("File uploaded successfully from URL!");
+      window.dispatchEvent(new Event("files-updated"));
+      setUrl("");
+    } catch (err) {
+      setError(err.message || "URL upload failed");
     } finally {
       setLoading(false);
     }
@@ -66,10 +88,11 @@ export default function Upload() {
         <div className="bg-red-100 text-red-800 p-2 mb-2 rounded">{error}</div>
       )}
 
+      {/* File Upload */}
       <div
         onDrop={handleDrop}
         onDragOver={handleDragOver}
-        className="flex items-center justify-center w-full"
+        className="flex items-center justify-center w-full mb-5"
       >
         <label
           htmlFor="dropzone-file"
@@ -98,6 +121,31 @@ export default function Upload() {
             onChange={handleFileChange}
           />
         </label>
+      </div>
+
+      {/* URL Upload */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center w-full border border-gray-300 rounded px-3 py-2">
+          <FiLink className="text-gray-500 mr-2" />
+          <input
+            type="text"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Paste file URL here"
+            className="w-full outline-none"
+          />
+        </div>
+        <button
+          onClick={uploadFromUrl}
+          disabled={loading}
+          className={`px-4 py-2 rounded text-white ${
+            loading
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"
+          } cursor-pointer`}
+        >
+          {loading ? "Uploading..." : "Upload"}
+        </button>
       </div>
     </div>
   );
