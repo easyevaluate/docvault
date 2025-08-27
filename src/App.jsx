@@ -1,20 +1,24 @@
 import React from "react";
 import { Routes, Route, Link, useNavigate } from "react-router-dom";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Forgot from "./pages/Forgot";
-import Reset from "./pages/Reset";
+import Login from "./pages/auth/Login";
+import Register from "./pages/auth/Register";
+import VerifyEmail from "./pages/auth/VerifyEmail";
+import Forgot from "./pages/auth/Forgot";
+import Reset from "./pages/auth/Reset";
 import Dashboard from "./pages/Dashboard";
-import { isLoggedIn, logout as authLogout } from "./services/auth";
+import Gallery from "./pages/gallery";
+
 import ProtectedRoute from "./components/ProtectedRoute";
-import VerifyEmail from "./pages/VerifyEmail";
+
+import { authApi } from "./apis/endpoints/auth";
+import { isLoggedIn } from "./apis/tokens";
 
 export default function App() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
-      await authLogout();
+      await authApi.logout();
       navigate("/login");
     } catch (err) {
       console.error("Logout failed:", err);
@@ -29,6 +33,7 @@ export default function App() {
             FileManager
           </Link>
           <div className="space-x-3">
+            <Link to="/gallery">Gallery</Link>
             {!isLoggedIn() && (
               <>
                 <Link to="/login">Login</Link>
@@ -73,6 +78,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/gallery" element={<Gallery />} />
         </Routes>
       </main>
     </div>

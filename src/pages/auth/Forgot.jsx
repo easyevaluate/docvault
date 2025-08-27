@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import api from "../services/api";
+import { authApi } from "../../apis/endpoints/auth";
 
 export default function Forgot() {
   const [email, setEmail] = useState("");
@@ -10,7 +10,7 @@ export default function Forgot() {
     e.preventDefault();
     setError(null);
     try {
-      await api.authPost("/forgot", { email });
+      await authApi.forgotPassword({ email });
       setMessage("If that email exists, a reset link has been sent.");
     } catch (err) {
       setError(err.message || "Request failed");

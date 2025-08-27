@@ -1,33 +1,40 @@
 import React, { useState, useRef } from "react";
-import api from "../services/api";
 import { VscRunAbove } from "react-icons/vsc";
 import { FiUploadCloud } from "react-icons/fi";
-import { FiLink } from "react-icons/fi";
+import { IoMdClose } from "react-icons/io";
+import { formatFileSize } from "../utils/file";
+import { filesApi } from "../apis/endpoints/files";
+import { TbFileSymlink } from "react-icons/tb";
 
 export default function Upload() {
-  const [file, setFile] = useState(null);
-  const [url, setUrl] = useState("");
+  const [files, setFiles] = useState([]);
+  const [fileUrl, setFileUrl] = useState("");
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  async function uploadFile(selectedFile) {
-    if (!selectedFile) return;
-    setFile(selectedFile);
+  // Upload files to server
+  async function uploadFiles() {
+    if (files.length === 0) return;
+
     setMessage(null);
     setError(null);
     setLoading(true);
 
     try {
       const form = new FormData();
-      form.append("file", selectedFile);
+      form.append("folder", "gallery");
+      form.append("isPublic", "true");
+      files.forEach((file) => form.append("files", file));
 
-      await api.filesPost("/upload", form, true);
-      setMessage("File uploaded successfully!");
+      await filesApi.post("/upload", form, true);
+
+      setMessage("Files uploaded successfully!");
       window.dispatchEvent(new Event("files-updated"));
 
-      setFile(null);
+      // Clear files after upload
+      setFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
       setError(err.message || "File upload failed");
@@ -36,47 +43,75 @@ export default function Upload() {
     }
   }
 
-  async function uploadFromUrl() {
-    if (!url.trim()) {
-      setError("Please enter a valid URL");
+  // Handle file fetch from URL
+  async function handleUrlUpload() {
+    if (!fileUrl.trim()) {
+      setError("Please enter a valid file URL");
       return;
     }
 
-    setMessage(null);
     setError(null);
+    setMessage(null);
     setLoading(true);
 
     try {
-      await api.filesPost("/upload-url", { url });
-      setMessage("File uploaded successfully from URL!");
-      window.dispatchEvent(new Event("files-updated"));
-      setUrl("");
+      const response = await fetch(fileUrl);
+      if (!response.ok) throw new Error("Failed to fetch file");
+
+      const blob = await response.blob();
+      const urlParts = fileUrl.split("/");
+      const filename = urlParts[urlParts.length - 1] || "downloaded-file";
+      const file = new File([blob], filename, { type: blob.type });
+
+      addFiles([file]);
+      setFileUrl("");
+      setMessage("File fetched successfully!");
     } catch (err) {
-      setError(err.message || "URL upload failed");
+      setError(err.message || "Could not fetch file from URL");
     } finally {
       setLoading(false);
     }
   }
 
-  function handleFileChange(e) {
-    const selectedFile = e.target.files[0];
-    if (selectedFile) uploadFile(selectedFile);
+  // Add new files and append to existing
+  function addFiles(newFiles) {
+    const filesArray = Array.from(newFiles);
+    setFiles((prevFiles) => [
+      ...prevFiles,
+      ...filesArray.filter(
+        (f) => !prevFiles.some((pf) => pf.name === f.name && pf.size === f.size)
+      ),
+    ]);
   }
 
+  // Handle file input change
+  function handleFileChange(e) {
+    if (e.target.files.length > 0) {
+      addFiles(e.target.files);
+    }
+  }
+
+  // Handle drag and drop
   function handleDrop(e) {
     e.preventDefault();
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) uploadFile(droppedFile);
+    if (e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
+    }
   }
 
   function handleDragOver(e) {
     e.preventDefault();
   }
 
+  // Remove a single file
+  function removeFile(index) {
+    setFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
+  }
+
   return (
     <div className="p-4 border border-gray-200 rounded bg-white">
       <h2 className="font-semibold mb-3 text-lg flex items-center gap-2">
-        <VscRunAbove className="text-blue-600 text-xl" /> Upload File
+        <VscRunAbove className="text-blue-600 text-xl" /> Upload Files
       </h2>
 
       {message && (
@@ -88,61 +123,95 @@ export default function Upload() {
         <div className="bg-red-100 text-red-800 p-2 mb-2 rounded">{error}</div>
       )}
 
-      {/* File Upload */}
-      <div
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        className="flex items-center justify-center w-full mb-5"
-      >
-        <label
-          htmlFor="dropzone-file"
-          className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition"
-        >
-          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-            <FiUploadCloud className="w-8 h-8 mb-4 text-gray-500" />
-            <p className="mb-2 text-sm text-gray-500">
-              <span className="font-semibold">Click to upload</span> or drag and
-              drop
-            </p>
-            <p className="text-xs text-gray-500">
-              SVG, PNG, JPG, GIF (MAX. 800x400px)
-            </p>
-            {file && (
-              <p className="mt-2 text-sm text-blue-600 font-medium">
-                {loading ? "Uploading..." : `Selected: ${file.name}`}
-              </p>
-            )}
-          </div>
-          <input
-            ref={fileInputRef}
-            id="dropzone-file"
-            type="file"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-        </label>
-      </div>
-
-      {/* URL Upload */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center w-full border border-gray-300 rounded px-3 py-2">
-          <FiLink className="text-gray-500 mr-2" />
+      <div className="flex flex-col justify-center gap-4 w-full">
+        {/* URL Upload Section */}
+        <div className="flex items-center gap-2">
           <input
             type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="Paste file URL here"
-            className="w-full outline-none"
+            placeholder="Enter file URL"
+            value={fileUrl}
+            onChange={(e) => setFileUrl(e.target.value)}
+            className="flex-1 border border-gray-300 rounded outline-none px-3 py-2"
           />
+          <button
+            onClick={handleUrlUpload}
+            disabled={!fileUrl || loading}
+            className={`px-3 py-2 rounded text-blue-500 bg-gray-50 ${
+              !fileUrl || loading ? "cursor-not-allowed" : "cursor-pointer"
+            }`}
+          >
+            <TbFileSymlink className="text-2xl" />
+          </button>
         </div>
+
+        <i className="mx-auto">OR</i>
+
+        {/* Manual Upload Section */}
+        <div onDrop={handleDrop} onDragOver={handleDragOver}>
+          <label
+            htmlFor="dropzone-file"
+            className="flex flex-col items-center justify-center w-full border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition"
+          >
+            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+              <FiUploadCloud className="w-8 h-8 mb-4 text-gray-500" />
+              <p className="mb-2 text-sm text-gray-500">
+                <span className="font-semibold">Click to select</span> or drag
+                and drop
+              </p>
+              <p className="text-xs text-gray-500">
+                SVG, PNG, JPG, GIF (MAX. 800x400px)
+              </p>
+            </div>
+            <input
+              ref={fileInputRef}
+              id="dropzone-file"
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </label>
+        </div>
+
+        {/* File List Section */}
+        {files.length > 0 && (
+          <div className="text-blue-600 font-medium border border-gray-200 rounded-xl p-3">
+            <ul className="list-disc list-inside">
+              {files.map((f, idx) => (
+                <li
+                  key={idx}
+                  className="flex items-center justify-between gap-2 py-1"
+                >
+                  <div className="flex items-center gap-2">
+                    <span>{f.name}</span>
+                    <span className="text-gray-500 text-sm">
+                      ({formatFileSize(f.size)})
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(idx);
+                    }}
+                    className="p-1 bg-red-100 ml-2 text-red-500 rounded-full cursor-pointer"
+                  >
+                    <IoMdClose />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Upload Button */}
         <button
-          onClick={uploadFromUrl}
-          disabled={loading}
-          className={`px-4 py-2 rounded text-white ${
-            loading
+          onClick={uploadFiles}
+          disabled={files.length === 0 || loading}
+          className={`w-40 px-4 py-2 rounded cursor-pointer text-white ${
+            files.length === 0 || loading
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-blue-600 hover:bg-blue-700"
-          } cursor-pointer`}
+          }`}
         >
           {loading ? "Uploading..." : "Upload"}
         </button>

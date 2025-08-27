@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import api from "../services/api";
 import { useNavigate } from "react-router-dom";
+import { authApi } from "../../apis/endpoints/auth";
 
 export default function Register() {
   const [fullname, setFullname] = useState("");
@@ -14,7 +14,7 @@ export default function Register() {
     e.preventDefault();
     setError(null);
     try {
-      await api.authPost("/register", { fullname, email, password });
+      await authApi.register({ fullname, email, password });
       setMessage("Registration successful. Please check your email to verify.");
       setTimeout(() => navigate("/login"), 1500);
     } catch (err) {

@@ -1,39 +1,28 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import api from "../services/api";
-import { saveTokens } from "../services/auth";
+import { authApi } from "../../apis/endpoints/auth";
+import { BASE_URLS } from "../../apis/config";
+import { saveTokens } from "../../apis/tokens";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
-  const [data, setData] = useState();
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Get OAuth login code from URL
   const queryParams = new URLSearchParams(location.search);
   const code = queryParams.get("login_code");
-  const oauthBase = "http://localhost:5050/api/oauth";
 
+  // Handle OAuth login
   const handleOAuthLogin = (provider) => {
     const redirectUri = encodeURIComponent(`${window.location.origin}/login`);
-    window.location.href = `${oauthBase}/${provider}/${redirectUri}`;
+    window.location.href = `${BASE_URLS.oauth}/${provider}/${redirectUri}`;
   };
 
-  async function submit(e) {
-    e.preventDefault();
-    setError(null);
-    try {
-      const res = await api.authPost("/login", { email, password });
-      // expecting { accessToken, refreshToken, user? }
-      saveTokens(res);
-      navigate("/dashboard");
-    } catch (err) {
-      setError(err.message || "Login failed");
-    }
-  }
-
   useEffect(() => {
+    // Clean up URL after OAuth login
     const cleanUrl = () => {
       const url = new URL(window.location.href);
       url.searchParams.delete("login_code");
@@ -44,18 +33,15 @@ export default function Login() {
       );
     };
 
-    const exchangeCode = async () => {
+    // Exchange OAuth code for tokens
+    (async () => {
       if (!code) return;
 
       try {
         const res = await fetch(
-          `http://localhost:5050/api/oauth/exchange-code?code=${code}`
+          `${BASE_URLS.oauth}/exchange-code?code=${code}`
         );
         const responseData = await res.json();
-        console.log("data: ", responseData);
-
-        setData(responseData);
-        console.log("User info:", responseData.data.user);
 
         if (responseData.data.tokens) {
           saveTokens(responseData);
@@ -67,10 +53,21 @@ export default function Login() {
       } finally {
         cleanUrl();
       }
-    };
-
-    exchangeCode();
+    })();
   }, [code, navigate]);
+
+  // Handle form submission
+  async function submit(e) {
+    e.preventDefault();
+    setError(null);
+    try {
+      const res = await authApi.login({ email, password });
+      saveTokens(res);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message || "Login failed");
+    }
+  }
 
   return (
     <div className="max-w-md mx-auto bg-white p-6 rounded shadow">
@@ -97,7 +94,7 @@ export default function Login() {
             Login
           </button>
           <Link to="/forgot" className="text-sm text-blue-600">
-            Forgot?
+            Forgot password?
           </Link>
         </div>
       </form>

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import api from "../services/api";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { authApi } from "../../apis/endpoints/auth";
 
 export default function Reset() {
   const [password, setPassword] = useState("");
@@ -14,7 +14,7 @@ export default function Reset() {
     e.preventDefault();
     setError(null);
     try {
-      await api.authPost("/reset", { token, password });
+      await authApi.resetPassword({ token, password });
       setMessage("Password reset successful. Redirecting to login...");
       setTimeout(() => navigate("/login"), 1400);
     } catch (err) {

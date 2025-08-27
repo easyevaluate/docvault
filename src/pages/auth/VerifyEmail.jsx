@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import api from "../services/api";
-import { saveTokens } from "../services/auth";
+import { authApi } from "../../apis/endpoints/auth";
+import { saveTokens } from "../../apis/tokens";
 
 export default function VerifyEmail() {
   const [status, setStatus] = useState("loading"); // "loading" | "success" | "error"
@@ -18,7 +18,7 @@ export default function VerifyEmail() {
         return;
       }
       try {
-        const res = await api.authPost("/verify-email", { token });
+        const res = await authApi.verifyEmail({ token });
         saveTokens(res);
 
         setStatus("success");

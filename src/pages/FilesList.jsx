@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
-import api from "../services/api";
+import { filesApi } from "../apis/endpoints/files";
+import { formatFileSize, isImage } from "../utils/file";
+import { FaRegFileLines } from "react-icons/fa6";
 import { FiDownload, FiTrash2 } from "react-icons/fi";
-import { BsFilePdf } from "react-icons/bs";
 
 export default function FilesList() {
   const [files, setFiles] = useState([]);
@@ -10,20 +11,12 @@ export default function FilesList() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Format file size
-  const formatFileSize = (size) => {
-    if (!size) return "";
-    return size >= 1024 * 1024
-      ? (size / (1024 * 1024)).toFixed(2) + " MB"
-      : (size / 1024).toFixed(2) + " KB";
-  };
-
   // Load files list
   const loadFiles = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.filesGet("/");
+      const res = await filesApi.get("/");
       setFiles(res.data || []);
     } catch (err) {
       setError(err.message || "Could not load files");
@@ -50,11 +43,11 @@ export default function FilesList() {
       await Promise.all(
         files.map(async (file) => {
           try {
-            const blob = await api.filesGet(`/download/${file.id}`);
+            const blob = await filesApi.get(`/stream/${file.id}`);
             // Store blob for download later
             blobs[file.id] = blob;
             // If image, create preview URL
-            if (file.mimetype?.startsWith("image/")) {
+            if (isImage(file)) {
               previewsMap[file.id] = URL.createObjectURL(blob);
             }
           } catch (err) {
@@ -69,7 +62,17 @@ export default function FilesList() {
       }
     }
 
-    if (files.length > 0) generatePreviews();
+    if (files.length > 0) {
+      const imagePaths = files
+        .filter((file) => isImage(file) && file.path)
+        .map((file) => file.path);
+
+      localStorage.setItem("imagePaths", JSON.stringify(imagePaths));
+
+      generatePreviews();
+    } else {
+      localStorage.removeItem("imagePaths");
+    }
 
     return () => {
       isCancelled = true;
@@ -99,7 +102,7 @@ export default function FilesList() {
   const removeFile = async (id) => {
     if (!confirm("Delete this file?")) return;
     try {
-      await api.filesDelete("/delete/" + id);
+      await filesApi.delete("/delete/" + id);
       loadFiles();
     } catch (err) {
       alert(err.message || "Delete failed");
@@ -123,7 +126,7 @@ export default function FilesList() {
             className="flex items-center justify-between gap-4 p-3 border border-gray-200 rounded hover:bg-gray-50 transition"
           >
             <div className="flex items-center space-x-4">
-              {f.mimetype?.startsWith("image/") ? (
+              {isImage(f) ? (
                 <div className="w-16 h-16 rounded overflow-hidden bg-gray-200 relative">
                   {previews[f.id] ? (
                     <img
@@ -138,7 +141,7 @@ export default function FilesList() {
                 </div>
               ) : (
                 <div className="w-16 h-16 flex items-center justify-center bg-gray-200 rounded text-gray-500">
-                  <BsFilePdf className="text-2xl" />
+                  <FaRegFileLines className="text-2xl" />
                 </div>
               )}
 
